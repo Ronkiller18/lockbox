@@ -17,7 +17,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 
-from config import PBKDF2_ITER, SALT_SIZE, KEY_SIZE
+from backend.config import PBKDF2_ITER, SALT_SIZE, KEY_SIZE
 
 
 # ── Salt ──────────────────────────────────────────────────────────────────────
