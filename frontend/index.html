@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LockBox</title>
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+  <!-- ── SCREEN: Setup (first run) ───────────────────────────────────────── -->
+  <div id="screen-setup" class="screen hidden">
+    <div class="auth-shell">
+      <div class="auth-logo">
+        <div class="logo-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <span class="logo-text">LockBox</span>
+      </div>
+      <h1 class="auth-heading">Create your vault</h1>
+      <p class="auth-sub">Your master password encrypts everything. It is never stored — if you forget it, your data cannot be recovered.</p>
+      <div class="field">
+        <label for="setup-pw">Master password</label>
+        <div class="input-wrap">
+          <input type="password" id="setup-pw" placeholder="Choose a strong password" autocomplete="new-password" />
+          <button class="eye-btn" data-target="setup-pw" aria-label="Show password"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="setup-confirm">Confirm password</label>
+        <div class="input-wrap">
+          <input type="password" id="setup-confirm" placeholder="Repeat your password" autocomplete="new-password" />
+          <button class="eye-btn" data-target="setup-confirm" aria-label="Show password"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <div id="setup-error" class="auth-error hidden"></div>
+      <button class="btn-primary full" id="setup-submit">Create vault</button>
+    </div>
+  </div>
+
+  <!-- ── SCREEN: Unlock ──────────────────────────────────────────────────── -->
+  <div id="screen-unlock" class="screen hidden">
+    <div class="auth-shell">
+      <div class="auth-logo">
+        <div class="logo-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <span class="logo-text">LockBox</span>
+      </div>
+      <h1 class="auth-heading">Unlock your vault</h1>
+      <p class="auth-sub">Enter your master password to continue.</p>
+      <div class="field">
+        <label for="unlock-pw">Master password</label>
+        <div class="input-wrap">
+          <input type="password" id="unlock-pw" placeholder="Master password" autocomplete="current-password" />
+          <button class="eye-btn" data-target="unlock-pw" aria-label="Show password"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <div id="unlock-error" class="auth-error hidden"></div>
+      <button class="btn-primary full" id="unlock-submit">Unlock</button>
+    </div>
+  </div>
+
+  <!-- ── SCREEN: Vault ───────────────────────────────────────────────────── -->
+  <div id="screen-vault" class="screen hidden">
+
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo-icon sm"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <span class="logo-text">LockBox</span>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="btn-lock" title="Lock vault">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="vault-body">
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Vault</div>
+          <div class="nav-item active" data-filter="all">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            All items
+            <span class="nav-count" id="nav-count-all">0</span>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-label">
+            Tags
+            <button class="tag-manage-btn" id="btn-manage-tags" title="Manage tags">+</button>
+          </div>
+          <div id="sidebar-tags"></div>
+          <div class="nav-item dimmed" id="nav-no-tags" style="display:none;">No tags yet</div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="vault-main">
+        <div class="toolbar">
+          <div class="search-wrap">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="search-input" placeholder="Search vault…" />
+          </div>
+          <button class="btn-primary" id="btn-new-entry">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New entry
+          </button>
+        </div>
+
+        <div class="entries-meta" id="entries-meta"></div>
+        <div class="entries-list" id="entries-list"></div>
+
+        <div class="empty-state hidden" id="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <p>No entries yet</p>
+          <span>Click "New entry" to add your first password</span>
+        </div>
+      </main>
+    </div>
+
+    <div class="statusbar">
+      <span class="status-dot"></span>
+      <span class="status-text">Vault unlocked</span>
+      <span class="status-right">AES-256 · local only</span>
+    </div>
+  </div>
+
+  <!-- ── MODAL: New / Edit entry ─────────────────────────────────────────── -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-header">
+        <span class="modal-title" id="modal-title">New entry</span>
+        <button class="modal-close" id="modal-close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="entry-id" />
+
+        <div class="field">
+          <label for="entry-title">Title</label>
+          <input type="text" id="entry-title" placeholder="e.g. GitHub, Gmail…" />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="entry-username">Username</label>
+            <input type="text" id="entry-username" placeholder="username or email" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="entry-url">URL</label>
+            <input type="text" id="entry-url" placeholder="https://…" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="entry-password">Password</label>
+          <div class="pw-row">
+            <div class="input-wrap flex1">
+              <input type="password" id="entry-password" placeholder="Password" autocomplete="new-password" />
+              <button class="eye-btn" data-target="entry-password" aria-label="Show password"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            </div>
+            <button class="btn-gen-toggle" id="gen-toggle">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              Generate
+            </button>
+          </div>
+        </div>
+
+        <!-- Password generator panel -->
+        <div class="gen-panel" id="gen-panel">
+          <div class="gen-length-row">
+            <span class="gen-label">Length</span>
+            <input type="range" id="gen-length" min="8" max="64" value="16" />
+            <span class="gen-length-val" id="gen-length-val">16</span>
+          </div>
+          <div class="gen-options">
+            <label class="gen-opt"><input type="checkbox" id="gen-upper" checked /> Uppercase</label>
+            <label class="gen-opt"><input type="checkbox" id="gen-lower" checked /> Lowercase</label>
+            <label class="gen-opt"><input type="checkbox" id="gen-nums" checked /> Numbers</label>
+            <label class="gen-opt"><input type="checkbox" id="gen-syms" checked /> Symbols</label>
+          </div>
+          <div class="gen-output">
+            <span class="gen-preview" id="gen-preview"></span>
+            <button class="gen-use-btn" id="gen-use">Use this</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Tags</label>
+          <div class="tag-editor" id="tag-editor"></div>
+        </div>
+
+        <div class="field">
+          <label for="entry-notes">Notes</label>
+          <input type="text" id="entry-notes" placeholder="Optional notes…" />
+        </div>
+
+        <div id="modal-error" class="auth-error hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="modal-cancel">Cancel</button>
+        <button class="btn-primary" id="modal-save">Save entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL: Manage tags ──────────────────────────────────────────────── -->
+  <div id="tags-modal-overlay" class="modal-overlay hidden">
+    <div class="modal" style="max-width:360px;">
+      <div class="modal-header">
+        <span class="modal-title">Manage tags</span>
+        <button class="modal-close" id="tags-modal-close" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="hint-text">Tags are created when you add them to an entry. Delete a tag here to remove it from all entries.</p>
+        <div id="all-tags-list" style="margin-top:12px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+        <div class="hint-text" id="no-tags-hint" style="margin-top:12px; display:none;">No tags exist yet. Add tags when creating or editing entries.</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary" id="tags-modal-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
