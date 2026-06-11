@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 .env
 node_modules/
+*.enc
+dist/
+.pytest_cache/
+Thumbs.db
+.DS_Store
