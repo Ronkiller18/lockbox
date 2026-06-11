@@ -1,15 +1,17 @@
 /* ── LockBox frontend — app.js ───────────────────────────────────────────
-   All API calls go to /api/* (same host, served by FastAPI).
-   State lives entirely in memory — no localStorage, no cookies.
+   Step 5 additions:
+   - Auto-lock after 5 minutes of inactivity
+   - Password strength indicator
+   - Keyboard shortcuts: Ctrl+N, Ctrl+L, Escape
 ────────────────────────────────────────────────────────────────────────── */
 
 const API = '/api';
 
 // ── App state ──────────────────────────────────────────────────────────────
 const state = {
-  entries: [],          // full list from server
-  filtered: [],         // what's currently shown
-  activeTag: 'all',     // sidebar filter
+  entries: [],
+  filtered: [],
+  activeTag: 'all',
   searchQuery: '',
 };
 
@@ -70,6 +72,76 @@ document.querySelectorAll('.eye-btn').forEach(btn => {
   });
 });
 
+// ── Auto-lock ──────────────────────────────────────────────────────────────
+// Locks the vault after AUTO_LOCK_MS of no user interaction.
+// We reset the timer on every mouse move, click, or keypress.
+// When the timer fires we call the same lock function as the manual lock btn.
+
+const AUTO_LOCK_MS = 5 * 60 * 1000; // 5 minutes
+let autoLockTimer = null;
+
+function resetAutoLock() {
+  clearTimeout(autoLockTimer);
+  // Only schedule auto-lock if vault screen is visible
+  if (!screens.vault.classList.contains('hidden')) {
+    autoLockTimer = setTimeout(triggerAutoLock, AUTO_LOCK_MS);
+  }
+}
+
+async function triggerAutoLock() {
+  await api('POST', '/lock');
+  document.getElementById('unlock-pw').value = '';
+  clearError('unlock-error');
+  show('unlock');
+  toast('Vault locked due to inactivity');
+}
+
+// Attach activity listeners — passive:true means they never block scrolling
+['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+  document.addEventListener(evt, resetAutoLock, { passive: true });
+});
+
+// ── Keyboard shortcuts ─────────────────────────────────────────────────────
+// Ctrl+N  → new entry  (only when vault is visible)
+// Ctrl+L  → lock vault (only when vault is visible)
+// Escape  → close open modal
+//
+// We check event.key (layout-independent) rather than keyCode.
+// We guard against firing shortcuts while typing in an input/textarea.
+
+document.addEventListener('keydown', e => {
+  const vaultVisible = !screens.vault.classList.contains('hidden');
+  const modalOpen    = !document.getElementById('modal-overlay').classList.contains('hidden');
+  const tagsOpen     = !document.getElementById('tags-modal-overlay').classList.contains('hidden');
+  const typingInField = ['INPUT','TEXTAREA'].includes(document.activeElement.tagName);
+
+  // Escape — close modals (highest priority, always active)
+  if (e.key === 'Escape') {
+    if (modalOpen)  { closeModal();     return; }
+    if (tagsOpen)   { closeTagsModal(); return; }
+  }
+
+  // Shortcuts that require vault to be visible and no modal open
+  if (vaultVisible && !modalOpen && !tagsOpen) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault(); // prevent browser's new-window shortcut
+      openModal();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
+      e.preventDefault(); // prevent browser's address-bar focus
+      document.getElementById('btn-lock').click();
+      return;
+    }
+    // '/' focuses search (common convention, like GitHub)
+    if (e.key === '/' && !typingInField) {
+      e.preventDefault();
+      document.getElementById('search-input').focus();
+      return;
+    }
+  }
+});
+
 // ── Initialise: check vault status ────────────────────────────────────────
 async function init() {
   const { ok, data } = await api('GET', '/status');
@@ -80,6 +152,7 @@ async function init() {
   } else if (data.unlocked) {
     await loadVault();
     show('vault');
+    resetAutoLock();
   } else {
     show('unlock');
   }
@@ -88,10 +161,10 @@ async function init() {
 // ── Setup ──────────────────────────────────────────────────────────────────
 document.getElementById('setup-submit').addEventListener('click', async () => {
   clearError('setup-error');
-  const pw = document.getElementById('setup-pw').value;
+  const pw      = document.getElementById('setup-pw').value;
   const confirm = document.getElementById('setup-confirm').value;
 
-  if (!pw) return showError('setup-error', 'Please enter a master password.');
+  if (!pw)           return showError('setup-error', 'Please enter a master password.');
   if (pw.length < 8) return showError('setup-error', 'Password must be at least 8 characters.');
   if (pw !== confirm) return showError('setup-error', 'Passwords do not match.');
 
@@ -115,6 +188,7 @@ document.getElementById('setup-submit').addEventListener('click', async () => {
 
   await loadVault();
   show('vault');
+  resetAutoLock();
 });
 
 document.getElementById('setup-pw').addEventListener('keydown', e => {
@@ -139,11 +213,13 @@ document.getElementById('unlock-submit').addEventListener('click', async () => {
   btn.disabled = false;
 
   if (!res.ok) {
-    return showError('unlock-error', res.status === 401 ? 'Wrong password.' : (res.data.detail || 'Failed to unlock.'));
+    return showError('unlock-error',
+      res.status === 401 ? 'Wrong password.' : (res.data.detail || 'Failed to unlock.'));
   }
 
   await loadVault();
   show('vault');
+  resetAutoLock();
 });
 
 document.getElementById('unlock-pw').addEventListener('keydown', e => {
@@ -152,6 +228,7 @@ document.getElementById('unlock-pw').addEventListener('keydown', e => {
 
 // ── Lock ───────────────────────────────────────────────────────────────────
 document.getElementById('btn-lock').addEventListener('click', async () => {
+  clearTimeout(autoLockTimer);
   await api('POST', '/lock');
   document.getElementById('unlock-pw').value = '';
   clearError('unlock-error');
@@ -196,8 +273,8 @@ function getAllTags() {
 
 function renderSidebarTags() {
   const container = document.getElementById('sidebar-tags');
-  const noTags = document.getElementById('nav-no-tags');
-  const tags = getAllTags();
+  const noTags    = document.getElementById('nav-no-tags');
+  const tags      = getAllTags();
   container.innerHTML = '';
 
   document.getElementById('nav-count-all').textContent = state.entries.length;
@@ -236,7 +313,9 @@ document.querySelector('[data-filter="all"]').addEventListener('click', () => {
 
 // ── Render entries ─────────────────────────────────────────────────────────
 function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function avatarText(title) {
@@ -247,9 +326,9 @@ function avatarText(title) {
 }
 
 function renderEntries() {
-  const list = document.getElementById('entries-list');
+  const list  = document.getElementById('entries-list');
   const empty = document.getElementById('empty-state');
-  const meta = document.getElementById('entries-meta');
+  const meta  = document.getElementById('entries-meta');
 
   list.innerHTML = '';
 
@@ -257,11 +336,11 @@ function renderEntries() {
     empty.classList.remove('hidden');
     meta.textContent = '';
     if (state.entries.length && (state.searchQuery || state.activeTag !== 'all')) {
-      empty.querySelector('p').textContent = 'No results';
+      empty.querySelector('p').textContent    = 'No results';
       empty.querySelector('span').textContent = 'Try a different search or tag filter';
     } else {
-      empty.querySelector('p').textContent = 'No entries yet';
-      empty.querySelector('span').textContent = 'Click "New entry" to add your first password';
+      empty.querySelector('p').textContent    = 'No entries yet';
+      empty.querySelector('span').textContent = 'Click "New entry" or press Ctrl+N';
     }
     return;
   }
@@ -271,7 +350,7 @@ function renderEntries() {
 
   state.filtered.forEach(entry => {
     const card = document.createElement('div');
-    card.className = 'entry-card';
+    card.className  = 'entry-card';
     card.dataset.id = entry.id;
 
     const tags = (entry.tags || []).map(t =>
@@ -324,6 +403,62 @@ async function deleteEntry(id, title) {
   }
 }
 
+// ── Password strength ──────────────────────────────────────────────────────
+// Scores the password on 5 axes and returns 0-4:
+//   0 = very weak   (shown in red)
+//   1 = weak        (shown in orange)
+//   2 = fair        (shown in yellow)
+//   3 = strong      (shown in green)
+//   4 = very strong (shown in bright green)
+//
+// Scoring criteria (each adds 1 point):
+//   - Length ≥ 10
+//   - Length ≥ 16
+//   - Contains uppercase + lowercase
+//   - Contains numbers
+//   - Contains symbols
+//
+// No library needed — pure JS, deterministic, instant.
+
+const STRENGTH_LABELS = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'];
+const STRENGTH_COLORS = ['#e24b4a', '#e2874a', '#e2c44a', '#1d9e75', '#34d399'];
+
+function scorePassword(pw) {
+  if (!pw) return -1; // hidden state
+  let score = 0;
+  if (pw.length >= 10) score++;
+  if (pw.length >= 16) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return Math.min(score, 4);
+}
+
+function updateStrengthBar(pw) {
+  const bar      = document.getElementById('strength-bar');
+  const label    = document.getElementById('strength-label');
+  const wrap     = document.getElementById('strength-wrap');
+  const score    = scorePassword(pw);
+
+  if (score === -1) {
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  const pct   = ((score + 1) / 5) * 100;
+  const color = STRENGTH_COLORS[score];
+  bar.style.width      = pct + '%';
+  bar.style.background = color;
+  label.textContent    = STRENGTH_LABELS[score];
+  label.style.color    = color;
+}
+
+// Hook into the password field in the modal
+document.getElementById('entry-password').addEventListener('input', e => {
+  updateStrengthBar(e.target.value);
+});
+
 // ── Password generator ─────────────────────────────────────────────────────
 const CHARS = {
   upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
@@ -333,7 +468,7 @@ const CHARS = {
 };
 
 function generatePassword() {
-  const len = parseInt(document.getElementById('gen-length').value);
+  const len  = parseInt(document.getElementById('gen-length').value);
   const pool = [
     document.getElementById('gen-upper').checked ? CHARS.upper : '',
     document.getElementById('gen-lower').checked ? CHARS.lower : '',
@@ -369,7 +504,8 @@ document.getElementById('gen-use').addEventListener('click', () => {
   const pw = document.getElementById('gen-preview').textContent;
   const input = document.getElementById('entry-password');
   input.value = pw;
-  input.type = 'text';
+  input.type  = 'text';
+  updateStrengthBar(pw);   // update strength when generator applies a password
   toast('Password applied');
 });
 
@@ -381,9 +517,9 @@ function getModalTags() {
 
 function addTagChip(tag, container) {
   const chip = document.createElement('div');
-  chip.className = 'tag-chip';
-  chip.dataset.tag = tag;
-  chip.innerHTML = `${escHtml(tag)}<button aria-label="Remove tag" title="Remove">×</button>`;
+  chip.className    = 'tag-chip';
+  chip.dataset.tag  = tag;
+  chip.innerHTML    = `${escHtml(tag)}<button aria-label="Remove tag" title="Remove">×</button>`;
   chip.querySelector('button').addEventListener('click', () => chip.remove());
   container.insertBefore(chip, container.querySelector('.tag-input-field'));
 }
@@ -395,10 +531,10 @@ function buildTagEditor(existingTags = []) {
   existingTags.forEach(t => addTagChip(t, editor));
 
   const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'tag-input-field';
+  input.type        = 'text';
+  input.className   = 'tag-input-field';
   input.placeholder = 'Add tag, press Enter…';
-  input.maxLength = 30;
+  input.maxLength   = 30;
   editor.appendChild(input);
 
   input.addEventListener('keydown', e => {
@@ -422,20 +558,23 @@ function buildTagEditor(existingTags = []) {
 // ── Modal: open / close ────────────────────────────────────────────────────
 function openModal(entry = null) {
   clearError('modal-error');
-  document.getElementById('modal-title').textContent = entry ? 'Edit entry' : 'New entry';
-  document.getElementById('modal-save').textContent = entry ? 'Save changes' : 'Save entry';
-  document.getElementById('entry-id').value = entry?.id || '';
-  document.getElementById('entry-title').value = entry?.title || '';
-  document.getElementById('entry-username').value = entry?.username || '';
-  document.getElementById('entry-password').value = entry?.password || '';
-  document.getElementById('entry-password').type = 'password';
-  document.getElementById('entry-url').value = entry?.url || '';
-  document.getElementById('entry-notes').value = entry?.notes || '';
+  document.getElementById('modal-title').textContent  = entry ? 'Edit entry' : 'New entry';
+  document.getElementById('modal-save').textContent   = entry ? 'Save changes' : 'Save entry';
+  document.getElementById('entry-id').value           = entry?.id || '';
+  document.getElementById('entry-title').value        = entry?.title || '';
+  document.getElementById('entry-username').value     = entry?.username || '';
+  document.getElementById('entry-password').value     = entry?.password || '';
+  document.getElementById('entry-password').type      = 'password';
+  document.getElementById('entry-url').value          = entry?.url || '';
+  document.getElementById('entry-notes').value        = entry?.notes || '';
 
   // Reset generator
   genOpen = false;
   document.getElementById('gen-panel').style.display = 'none';
   document.getElementById('gen-toggle').classList.remove('active');
+
+  // Update strength bar for existing entry password
+  updateStrengthBar(entry?.password || '');
 
   buildTagEditor(entry?.tags || []);
 
@@ -452,14 +591,6 @@ document.getElementById('modal-close').addEventListener('click', closeModal);
 document.getElementById('modal-cancel').addEventListener('click', closeModal);
 document.getElementById('modal-overlay').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeModal();
-});
-
-// Close on Escape
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    if (!document.getElementById('modal-overlay').classList.contains('hidden')) closeModal();
-    if (!document.getElementById('tags-modal-overlay').classList.contains('hidden')) closeTagsModal();
-  }
 });
 
 // ── Modal: save ────────────────────────────────────────────────────────────
@@ -483,14 +614,14 @@ document.getElementById('modal-save').addEventListener('click', async () => {
   };
 
   const btn = document.getElementById('modal-save');
-  btn.disabled = true;
+  btn.disabled    = true;
   btn.textContent = 'Saving…';
 
   const { ok, data } = id
     ? await api('PUT',  `/entries/${id}`, payload)
     : await api('POST', '/entries',       payload);
 
-  btn.disabled = false;
+  btn.disabled    = false;
   btn.textContent = id ? 'Save changes' : 'Save entry';
 
   if (!ok) return showError('modal-error', data.detail || 'Failed to save entry.');
@@ -502,17 +633,17 @@ document.getElementById('modal-save').addEventListener('click', async () => {
 
 // ── Manage tags modal ──────────────────────────────────────────────────────
 function openTagsModal() {
-  const list = document.getElementById('all-tags-list');
+  const list   = document.getElementById('all-tags-list');
   const noHint = document.getElementById('no-tags-hint');
-  const tags = getAllTags();
+  const tags   = getAllTags();
   list.innerHTML = '';
 
   if (!tags.length) {
     noHint.style.display = '';
-    list.style.display = 'none';
+    list.style.display   = 'none';
   } else {
     noHint.style.display = 'none';
-    list.style.display = 'flex';
+    list.style.display   = 'flex';
     tags.forEach(tag => {
       const el = document.createElement('div');
       el.className = 'deletable-tag';

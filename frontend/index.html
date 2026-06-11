@@ -121,7 +121,12 @@
     <div class="statusbar">
       <span class="status-dot"></span>
       <span class="status-text">Vault unlocked</span>
-      <span class="status-right">AES-256 · local only</span>
+      <div class="shortcut-hints">
+      <span class="shortcut"><kbd>Ctrl</kbd><kbd>N</kbd> new</span>
+      <span class="shortcut"><kbd>Ctrl</kbd><kbd>L</kbd> lock</span>
+      <span class="shortcut"><kbd>/</kbd> search</span>
+      <span class="status-text" style="margin-left:4px;">· AES-256</span>
+    </div>
     </div>
   </div>
 
@@ -165,6 +170,11 @@
               Generate
             </button>
           </div>
+        </div>
+        <!-- Password strength indicator -->
+        <div id="strength-wrap" class="strength-wrap hidden">
+          <div class="strength-track"><div class="strength-bar" id="strength-bar"></div></div>
+          <span class="strength-label" id="strength-label"></span>
         </div>
 
         <!-- Password generator panel -->
