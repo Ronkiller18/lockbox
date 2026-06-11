@@ -1,0 +1,44 @@
+{
+  "name": "lockbox",
+  "version": "0.1.0",
+  "description": "Local AES-256 encrypted password manager",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder build --linux"
+  },
+  "build": {
+    "appId": "com.lockbox.app",
+    "productName": "LockBox",
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility",
+      "icon": "assets/icon.png"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/**/*",
+      "backend/**/*",
+      "assets/**/*",
+      "venv/**/*",
+      "requirements.txt"
+    ],
+    "extraResources": [
+      {
+        "from": "venv",
+        "to": "venv"
+      },
+      {
+        "from": "backend",
+        "to": "backend"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
